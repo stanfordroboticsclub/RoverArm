@@ -26,23 +26,25 @@ class Arm:
 
         self.xyz_names = ["x", "y","yaw"]
 
-        self.motor_names = ["shoulder","elbow","yaw"]
-
+        self.cartesian_motors = ["shoulder","elbow","yaw"]
+        self.motor_names = ["shoulder","elbow","yaw","roll","grip"]
 	self.pwm_names = ["pitch"]
-	self.ordering = ["shoulder","elbow","pitch","yaw"]
+	self.ordering = ["shoulder","elbow","pitch","yaw","grip","roll"]
         self.native_positions = { motor:0 for motor in self.motor_names}
         self.xyz_positions    = { axis:0 for axis in self.xyz_names}
         self.elbow_left = True
 
         self.CPR = {'shoulder':-10.4 * 4802.493,
                     'elbow'   : 10.4 * 4802.493,
-                    'yaw'     : float(48)/27 * 34607}
+                    'yaw'     : float(48)/27 * 34607,
+                    'roll'    : 455.185*float(12*53/20),
+                    'grip'    : 103.814*float(12*36/27)}
         #            'pitch'   : -2 * 34607}
 
         self.SPEED_SCALE = 20
 
         self.rc = RoboClaw(find_serial_port(), names = self.ordering,\
-                                                    addresses = [130,128])
+                                                    addresses = [130,128,129])
 	self.zeroed = False
 
         try:
@@ -59,7 +61,7 @@ class Arm:
             self.send_speeds( {motor: 0 for motor in self.motor_names}, {motor: 0 for motor in self.pwm_names} )
             raise
 
-    def condition_input(self,target):
+    def condition_input(self,target): 
         target['x']     = - target['x']
         if(target['pitch'] > .1):
         	target['pitch'] = - 1.1* (target['pitch']-.1)
@@ -67,7 +69,8 @@ class Arm:
                 target['pitch'] = - 1.1* (target['pitch']+.1)
         else:
         	target['pitch'] = 0
-        target['grip'] = - target['grip']
+        target['grip'] = - .02*target['grip']
+        target['roll'] = .01*target['roll']
         target['z'] = - target['z']
         if(target['yaw'] > .1): 
         	target['yaw']  = 0.008* (1.1 * (target['yaw']-.1))**2
@@ -98,7 +101,7 @@ class Arm:
             self.rc.drive_duty(motor, int(20000*target[motor]))
 
     def get_location(self):
-        for i,motor in enumerate(self.motor_names):
+        for i,motor in enumerate(self.cartesian_motors):
             encoder = self.rc.read_encoder(motor)[1]
             print motor,encoder
             self.native_positions[motor] = 2 * math.pi * encoder/self.CPR[motor]
@@ -171,11 +174,11 @@ class Arm:
         f_x_plus_h = self.xyz_to_native(x_plus_h)
         f_x        = self.xyz_to_native(self.xyz_positions)
 
-        dnative = {motor:(f_x_plus_h[motor] - f_x[motor])/h for motor in self.motor_names}
+        dnative = {motor:(f_x_plus_h[motor] - f_x[motor])/h for motor in self.cartesian_motors}
 
         print("Dxyz   : ", dxyz)
         print("Dnative: ", dnative)
-        print("new location: ", self.native_to_xyz ( {motor:dnative[motor] + f_x[motor] for motor in self.motor_names}) )
+        print("new location: ", self.native_to_xyz ( {motor:dnative[motor] + f_x[motor] for motor in self.cartesian_motors}) )
         return dnative
 
 
@@ -197,6 +200,8 @@ class Arm:
             speeds['elbow'] -= 0.002 * target_f['hat'][0]
             speeds['shoulder'] -= 0.002 * target_f['hat'][1]
             speeds['yaw'] += target_f['yaw']
+            speeds['roll'] = target_f['roll']
+            speeds['grip'] = target_f['grip'] + speeds['roll']
             if speeds['elbow'] == 0 and speeds['shoulder'] == 0:
                 self.elbow_left = self.native_positions['elbow'] < 0
 
