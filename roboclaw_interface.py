@@ -40,7 +40,8 @@ class RoboClaw:
             self.speed[names[2*i+1]] = 1000
 
         #roboclaw_driver.Open(port, 115200)
-        roboclaw_driver.Open(port, 19200)
+        #roboclaw_driver.Open(port, 19200)
+        roboclaw_driver.Open(port, 38400)
         # How does this work>
         # self.serial_lock = Lock()
         # try:
