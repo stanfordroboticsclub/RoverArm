@@ -87,8 +87,8 @@ class Arm:
         return xyz
 
     def dnative(self, dxyz):
-	x = self.xyz_positions['x']
-	y = self.xyz_positions['y']
+        x = self.xyz_positions['x']
+        y = self.xyz_positions['y']
 
         shoulder_diff_x = y/(x**2 + y**2) - (x/(FIRST_LINK*math.sqrt(x**2 + y**2)) - x*(FIRST_LINK**2 - SECOND_LINK**2 + x**2 + y**2)/(2*FIRST_LINK*(x**2 + y**2)**(3/2)))/math.sqrt(1 - (FIRST_LINK**2 - SECOND_LINK**2 + x**2 + y**2)**2/(4*FIRST_LINK**2*(x**2 + y**2)))
 
