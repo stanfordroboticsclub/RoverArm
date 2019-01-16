@@ -1,8 +1,9 @@
 
 
-from UDPComms import Subscriber
+from UDPComms import Subscriber, timeout
 from roboclaw_interface import RoboClaw
 import math
+import time
 
 
 FIRST_LINK = 1000
@@ -39,7 +40,7 @@ class Vector(list):
 
 class Arm:
     def __init__(self):
-        self.target = Subscriber(8410)
+        self.target_vel = Subscriber(8410)
 
         self.xyz_names = ["x", "y"]
 
@@ -51,27 +52,72 @@ class Arm:
 
         self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128] ) # addresses = [128, 129, 130])
 
+        while 1:
+            self.update()
+            time.sleep(100)
+
+    def send_speeds(self, speeds):
+        for motor in self.motor_names:
+            self.rc.drive_speed(motor, speeds[motor])
 
     def get_location(self):
         for motor in self.motor_names:
-            self.native_positions[motor] = self.rc.get_encoder(motor)/self.CPR[motor]
+            self.native_positions[motor] = 2 * math.pi * self.rc.get_encoder(motor)/self.CPR[motor]
 
         self.xyz_positions = self.native_to_xyz(self.native_positions)
 
     def xyz_to_native(self, xyz):
-        pass
+        native = {}
+
+        distance = math.sqrt(xyz['x']**2 + xyz['y']**2)
+        angle = math.atan2(xyz['x'], xyz['y'])
+
+        offset = math.acos( ( FIRST_LINK**2 + distance**2 - SECOND_LINK**2  ) / (2*distance * FIRST_LINK) )
+        inside = math.acos( ( FIRST_LINK**2 + SECOND_LINK**2 - distance**2  ) / (2*SECOND_LINK * FIRST_LINK) )
+
+        native['shoulder'] = angle + offset
+        native['elbow'] = - (math.pi - inside) 
+
+        return native
 
     def native_to_xyz(self, native):
-        pass
-        # self.native_positions['x'] = 
-        # self.native_positions['y'] = 
+        xyz = {}
+        xyz['x'] = FIRST_LINK * math.sin(native['shoulder']) + SECOND_LINK * math.sin(native['shoulder'] + native['elbow'])
+        xyz['y'] = FIRST_LINK * math.cos(native['shoulder']) + SECOND_LINK * math.cos(native['shoulder'] + native['elbow'])
+        return xyz
+
+    def dnative(self, dxyz):
+	x = self.xyz_positions['x']
+	y = self.xyz_positions['y']
+
+        shoulder_diff_x = y/(x**2 + y**2) - (x/(FIRST_LINK*math.sqrt(x**2 + y**2)) - x*(FIRST_LINK**2 - SECOND_LINK**2 + x**2 + y**2)/(2*FIRST_LINK*(x**2 + y**2)**(3/2)))/math.sqrt(1 - (FIRST_LINK**2 - SECOND_LINK**2 + x**2 + y**2)**2/(4*FIRST_LINK**2*(x**2 + y**2)))
+
+        shoulder_diff_y = -x/(x**2 + y**2) - (y/(FIRST_LINK*math.sqrt(x**2 + y**2)) - y*(FIRST_LINK**2 - SECOND_LINK**2 + x**2 + y**2)/(2*FIRST_LINK*(x**2 + y**2)**(3/2)))/math.sqrt(1 - (FIRST_LINK**2 - SECOND_LINK**2 + x**2 + y**2)**2/(4*FIRST_LINK**2*(x**2 + y**2)))
+
+        elbow_diff_x = -x/(FIRST_LINK*SECOND_LINK*math.sqrt(1 - (FIRST_LINK**2 + SECOND_LINK**2 - x**2 - y**2)**2/(4*FIRST_LINK**2*SECOND_LINK**2)))
+
+        elbow_diff_y = -y/(FIRST_LINK*SECOND_LINK*math.sqrt(1 - (FIRST_LINK**2 + SECOND_LINK**2 - x**2 - y**2)**2/(4*FIRST_LINK**2*SECOND_LINK**2)))
+
+        dnative = {}
+        dnative['shoulder'] = shoulder_diff_x * x + shoulder_diff_y * y 
+        dnative['elbow']    = elbow_diff_x * x    + elbow_diff_y * y 
+        return dnative
+
 
     def update(self):
-        current_location = Vector(self.get_location())
-        target_location = Vector( self.target.get() )
+        self.get_location()
 
-        delta = (target_location - current_location) 
+        try:
+            speeds = self.dnative_dxyz(self.target_vel.get())
+        except timeout:
+            speed = {motor: 0 for motor in self.motor_names}
+        except:
+            speed = {motor: 0 for motor in self.motor_names}
+            raise
+        finally:
+            self.send_speeds(speeds)
 
-        delta * (1/delta.norm())
+
+
 
 
