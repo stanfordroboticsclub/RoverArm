@@ -49,6 +49,7 @@ class Arm:
 
         self.native_positions = { motor:0 for motor in self.motor_names}
         self.CPR = { motor:100 for motor in self.motor_names}
+        self.SPEED_SCALE = 10
 
         self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128] ) # addresses = [128, 129, 130])
 
@@ -58,13 +59,15 @@ class Arm:
 
     def send_speeds(self, speeds):
         for motor in self.motor_names:
-            self.rc.drive_speed(motor, speeds[motor])
+            self.rc.drive_speed(motor, self.SPEED_SCALE * self.CPR[motor] * speeds[motor])
 
     def get_location(self):
         for motor in self.motor_names:
             self.native_positions[motor] = 2 * math.pi * self.rc.get_encoder(motor)/self.CPR[motor]
 
         self.xyz_positions = self.native_to_xyz(self.native_positions)
+        print("Current Native: ", self.native_positions)
+        print("Current    XYZ: ", self.xyz_positions)
 
     def xyz_to_native(self, xyz):
         native = {}
@@ -99,8 +102,11 @@ class Arm:
         elbow_diff_y = -y/(FIRST_LINK*SECOND_LINK*math.sqrt(1 - (FIRST_LINK**2 + SECOND_LINK**2 - x**2 - y**2)**2/(4*FIRST_LINK**2*SECOND_LINK**2)))
 
         dnative = {}
-        dnative['shoulder'] = shoulder_diff_x * x + shoulder_diff_y * y 
-        dnative['elbow']    = elbow_diff_x * x    + elbow_diff_y * y 
+        dnative['shoulder'] = shoulder_diff_x * dxyz['x'] + shoulder_diff_y * dxyz['y'] 
+        dnative['elbow']    = elbow_diff_x    * dxyz['x']    + elbow_diff_y * dxyz['y'] 
+
+        print("Dxyz   : ", dxyz)
+        print("Dnative: ", dnative)
         return dnative
 
 
@@ -108,7 +114,8 @@ class Arm:
         self.get_location()
 
         try:
-            speeds = self.dnative_dxyz(self.target_vel.get())
+            targt = self.target_vel.get()
+            speeds = self.dnative_dxyz({'x' :  targt['t'], 'y': targt['f']})
         except timeout:
             speed = {motor: 0 for motor in self.motor_names}
         except:
