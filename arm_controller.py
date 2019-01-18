@@ -12,6 +12,7 @@ SECOND_LINK = 1000
 # native angles = 0 at extension
 
 def find_serial_port():
+    return '/dev/tty.usbmodem1411'
     return '/dev/ttyUSB0'
     return '/dev/ttyACM0'
     return '/dev/tty.usbmodem1141'
@@ -44,26 +45,26 @@ class Arm:
 
         self.xyz_names = ["x", "y"]
 
-        self.motor_names = ["shoulder",
-                            "elbow"]
+        self.motor_names = ["elbow", "shoulder"]
 
         self.native_positions = { motor:0 for motor in self.motor_names}
-        self.CPR = { motor:100 for motor in self.motor_names}
+        self.CPR = { 'shoulder': 87302, 'elbow':-87302}
         self.SPEED_SCALE = 10
 
         self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128] ) # addresses = [128, 129, 130])
 
         while 1:
             self.update()
-            time.sleep(100)
+            time.sleep(0.1)
 
     def send_speeds(self, speeds):
         for motor in self.motor_names:
-            self.rc.drive_speed(motor, self.SPEED_SCALE * self.CPR[motor] * speeds[motor])
+            print('driving', motor, 'at', self.SPEED_SCALE * self.CPR[motor] * speeds[motor])
+            # self.rc.drive_speed(motor, self.SPEED_SCALE * self.CPR[motor] * speeds[motor])
 
     def get_location(self):
         for motor in self.motor_names:
-            self.native_positions[motor] = 2 * math.pi * self.rc.get_encoder(motor)/self.CPR[motor]
+            self.native_positions[motor] = 2 * math.pi * self.rc.read_encoder(motor)[1]/self.CPR[motor]
 
         self.xyz_positions = self.native_to_xyz(self.native_positions)
         print("Current Native: ", self.native_positions)
@@ -115,11 +116,11 @@ class Arm:
 
         try:
             targt = self.target_vel.get()
-            speeds = self.dnative_dxyz({'x' :  targt['t'], 'y': targt['f']})
+            speeds = self.dnative({'x' :  targt['t'], 'y': targt['f']})
         except timeout:
-            speed = {motor: 0 for motor in self.motor_names}
+            speeds = {motor: 0 for motor in self.motor_names}
         except:
-            speed = {motor: 0 for motor in self.motor_names}
+            speeds = {motor: 0 for motor in self.motor_names}
             raise
         finally:
             self.send_speeds(speeds)
@@ -127,4 +128,5 @@ class Arm:
 
 
 
-
+if __name__ == "__main__":
+    a = Arm()
