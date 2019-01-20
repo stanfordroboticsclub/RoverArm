@@ -41,17 +41,19 @@ class Vector(list):
 
 class Arm:
     def __init__(self):
-        self.target_vel = Subscriber(8410)
+        # self.target_vel = Subscriber(8410)
 
         self.xyz_names = ["x", "y"]
 
         self.motor_names = ["elbow", "shoulder"]
 
         self.native_positions = { motor:0 for motor in self.motor_names}
-        self.CPR = { 'shoulder': 87302, 'elbow':-87302}
+        # self.CPR = { 'shoulder': 87302, 'elbow':-87302}
+        self.CPR = { 'shoulder': 10, 'elbow':10}
         self.SPEED_SCALE = 10
 
-        self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128] ) # addresses = [128, 129, 130])
+        # self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128] ) # addresses = [128, 129, 130])
+        # self.arm_loc = Subscriber(8450)
 
         while 1:
             self.update()
@@ -62,9 +64,10 @@ class Arm:
             print('driving', motor, 'at', self.SPEED_SCALE * self.CPR[motor] * speeds[motor])
             # self.rc.drive_speed(motor, self.SPEED_SCALE * self.CPR[motor] * speeds[motor])
 
-    def get_location(self):
-        for motor in self.motor_names:
-            self.native_positions[motor] = 2 * math.pi * self.rc.read_encoder(motor)[1]/self.CPR[motor]
+    def get_location(self, locs):
+        for i,motor in enumerate(self.motor_names):
+            # self.native_positions[motor] = 2 * math.pi * self.rc.read_encoder(motor)[1]/self.CPR[motor]
+            self.native_positions[motor] = 2 * math.pi * locs[i]
 
         self.xyz_positions = self.native_to_xyz(self.native_positions)
         print("Current Native: ", self.native_positions)
@@ -108,15 +111,33 @@ class Arm:
 
         print("Dxyz   : ", dxyz)
         print("Dnative: ", dnative)
+        print("new location: ", self.native_to_xyz ( {motor:dnative[motor] + self.native_positions[motor] for motor in self.motor_names}) )
+        return dnative
+
+    def dnative2(self, dxyz):
+        h = 0.00000001
+        x_plus_h = { axis:self.xyz_positions[axis] + h*dxyz[axis] for axis in self.xyz_names}
+
+        f_x_plus_h = self.xyz_to_native(x_plus_h)
+        f_x        = self.xyz_to_native(self.xyz_positions)
+
+        dnative = {motor:(f_x_plus_h[motor] - f_x[motor])/h for motor in self.motor_names}
+
+
+
+        print("Dxyz   : ", dxyz)
+        print("Dnative: ", dnative)
+        print("new location: ", self.native_to_xyz ( {motor:dnative[motor] + f_x[motor] for motor in self.motor_names}) )
         return dnative
 
 
     def update(self):
-        self.get_location()
+        self.get_location([ -0.01, 0] )
 
         try:
-            targt = self.target_vel.get()
-            speeds = self.dnative({'x' :  targt['t'], 'y': targt['f']})
+            # targt = self.target_vel.get()
+            targt = [0,-1]
+            speeds = self.dnative2({'x' :  targt[0], 'y': targt[1]})
         except timeout:
             speeds = {motor: 0 for motor in self.motor_names}
         except:
@@ -124,6 +145,7 @@ class Arm:
             raise
         finally:
             self.send_speeds(speeds)
+        exit()
 
 
 
