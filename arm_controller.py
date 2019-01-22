@@ -6,8 +6,8 @@ import math
 import time
 
 
-FIRST_LINK = 1000
-SECOND_LINK = 1000
+FIRST_LINK = 457.2
+SECOND_LINK = 457.2
 
 # native angles = 0 at extension
 
@@ -48,26 +48,32 @@ class Arm:
         self.motor_names = ["elbow", "shoulder"]
 
         self.native_positions = { motor:0 for motor in self.motor_names}
-        # self.CPR = { 'shoulder': 87302, 'elbow':-87302}
-        self.CPR = { 'shoulder': 10, 'elbow':10}
+        self.CPR = { 'shoulder': 4*12280, 'elbow':-4*12280}
+        # self.CPR = { 'shoulder': 10, 'elbow':10}
         self.SPEED_SCALE = 10
 
-        # self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128] ) # addresses = [128, 129, 130])
-        # self.arm_loc = Subscriber(8450)
+        self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128] ) # addresses = [128, 129, 130])
 
-        while 1:
-            self.update()
-            time.sleep(0.1)
+        try:
+            while 1:
+                self.update()
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            self.send_speeds( {motor: 0 for motor in self.motor_names} )
+            raise
+        except:
+            self.send_speeds( {motor: 0 for motor in self.motor_names} )
+            raise
 
     def send_speeds(self, speeds):
         for motor in self.motor_names:
-            print('driving', motor, 'at', self.SPEED_SCALE * self.CPR[motor] * speeds[motor])
-            # self.rc.drive_speed(motor, self.SPEED_SCALE * self.CPR[motor] * speeds[motor])
+            print('driving', motor, 'at', int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
+            self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
 
     def get_location(self, locs):
         for i,motor in enumerate(self.motor_names):
-            # self.native_positions[motor] = 2 * math.pi * self.rc.read_encoder(motor)[1]/self.CPR[motor]
-            self.native_positions[motor] = 2 * math.pi * locs[i]
+            self.native_positions[motor] = 2 * math.pi * self.rc.read_encoder(motor)[1]/self.CPR[motor]
+            # self.native_positions[motor] = 2 * math.pi * locs[i]
 
         self.xyz_positions = self.native_to_xyz(self.native_positions)
         print("Current Native: ", self.native_positions)
@@ -136,7 +142,7 @@ class Arm:
 
         try:
             # targt = self.target_vel.get()
-            targt = [0,-1]
+            targt = [1,0]
             speeds = self.dnative2({'x' :  targt[0], 'y': targt[1]})
         except timeout:
             speeds = {motor: 0 for motor in self.motor_names}
@@ -145,7 +151,7 @@ class Arm:
             raise
         finally:
             self.send_speeds(speeds)
-        exit()
+        # exit()
 
 
 
