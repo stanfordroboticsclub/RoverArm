@@ -12,6 +12,7 @@ SECOND_LINK = 457.2
 # native angles = 0 at extension
 
 def find_serial_port():
+    return '/dev/serial0'
     return '/dev/tty.usbmodem1411'
     return '/dev/ttyUSB0'
     return '/dev/ttyACM0'
@@ -41,18 +42,22 @@ class Vector(list):
 
 class Arm:
     def __init__(self):
-        # self.target_vel = Subscriber(8410)
+        self.target_vel = Subscriber(8830)
 
-        self.xyz_names = ["x", "y"]
+        self.xyz_names = ["x", "y", "yaw", "pitch"]
 
-        self.motor_names = ["elbow", "shoulder"]
+        self.motor_names = ["shoulder", "elbow", "yaw", "pitch"]
 
         self.native_positions = { motor:0 for motor in self.motor_names}
-        self.CPR = { 'shoulder': 4*12280, 'elbow':-4*12280}
+        self.CPR = {'shoulder': 10.4 * 1288.848, 
+                    'elbow'   :-10.4 * 921.744,
+                    'yaw'     : float(48)/28 * 34607 ,
+                    'pitch'   : 2 * 34607}
+
         # self.CPR = { 'shoulder': 10, 'elbow':10}
         self.SPEED_SCALE = 10
 
-        self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128] ) # addresses = [128, 129, 130])
+        self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128, 129] ) # addresses = [128, 129, 130])
 
         try:
             while 1:
@@ -89,7 +94,10 @@ class Arm:
         inside = math.acos( ( FIRST_LINK**2 + SECOND_LINK**2 - distance**2  ) / (2*SECOND_LINK * FIRST_LINK) )
 
         native['shoulder'] = angle + offset
-        native['elbow'] = - (math.pi - inside) 
+        native['elbow']    = - (math.pi - inside) 
+
+        native['yaw']      = xyz['yaw']  + native['shoulder'] - native['elbow']
+        native['pitch']    = xyz['pitch']
 
         return native
 
@@ -141,9 +149,13 @@ class Arm:
         self.get_location([ -0.01, 0] )
 
         try:
-            # targt = self.target_vel.get()
-            targt = [1,0]
-            speeds = self.dnative2({'x' :  targt[0], 'y': targt[1]})
+            targt = self.target_vel.get()
+            # targt = [0,-0.1]
+
+            speeds = self.dnative2(target)
+            # speeds = self.dnative2({'x' :  targt[0]/150, 'y': targt[1]})
+
+
         except timeout:
             speeds = {motor: 0 for motor in self.motor_names}
         except:
