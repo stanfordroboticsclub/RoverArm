@@ -18,31 +18,9 @@ def find_serial_port():
     return '/dev/ttyACM0'
     return '/dev/tty.usbmodem1141'
 
-class Vector(list):
-
-    def __add__(self,other):
-        assert len(self) == len(other)
-        return Vector( a+b for a,b in zip(self,other) )
-
-    def __sub__(self,other):
-        assert len(self) == len(other)
-        return Vector( a-b for a,b in zip(self,other) )
-
-    def __mul__(self,other):
-        return Vector( other * a for a in self )
-
-    def __rmul__(self,other):
-        return Vector.__mul__(self,other)  
-
-    def norm(self):
-        return math.sqrt(sum(a**2 for a in self))
-
-    def __repr__(self):
-        return "Vector(" + super().__repr__() + ")"
-
 class Arm:
     def __init__(self):
-        self.target_vel = Subscriber(8830)
+        self.target_vel = Subscriber(8410)
 
         self.xyz_names = ["x", "y", "yaw", "pitch"]
 
@@ -72,7 +50,7 @@ class Arm:
 
     def send_speeds(self, speeds):
         for motor in self.motor_names:
-            print('driving', motor, 'at', int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
+            #print('driving', motor, 'at', int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
             self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
 
     def get_location(self, locs):
@@ -105,6 +83,9 @@ class Arm:
         xyz = {}
         xyz['x'] = FIRST_LINK * math.sin(native['shoulder']) + SECOND_LINK * math.sin(native['shoulder'] + native['elbow'])
         xyz['y'] = FIRST_LINK * math.cos(native['shoulder']) + SECOND_LINK * math.cos(native['shoulder'] + native['elbow'])
+
+        xyz['yaw'] =  native['yaw']  - native['shoulder'] + native['elbow'] 
+        xyz['pitch']    = native['pitch']
         return xyz
 
     def dnative(self, dxyz):
@@ -130,6 +111,7 @@ class Arm:
 
     def dnative2(self, dxyz):
         h = 0.00000001
+       # print dxyz, self.xyz_positions
         x_plus_h = { axis:self.xyz_positions[axis] + h*dxyz[axis] for axis in self.xyz_names}
 
         f_x_plus_h = self.xyz_to_native(x_plus_h)
@@ -149,12 +131,13 @@ class Arm:
         self.get_location([ -0.01, 0] )
 
         try:
-            targt = self.target_vel.get()
+            target = self.target_vel.get()
+            target = {bytes(key): value for key, value in target.iteritems()}
             # targt = [0,-0.1]
 
             speeds = self.dnative2(target)
-            # speeds = self.dnative2({'x' :  targt[0]/150, 'y': targt[1]})
 
+            print "SPEEDS", speeds
 
         except timeout:
             speeds = {motor: 0 for motor in self.motor_names}
@@ -162,7 +145,8 @@ class Arm:
             speeds = {motor: 0 for motor in self.motor_names}
             raise
         finally:
-            self.send_speeds(speeds)
+            zero = {motor: 0 for motor in self.motor_names}
+            self.send_speeds(zero)
         # exit()
 
 
