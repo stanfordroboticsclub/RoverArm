@@ -1,4 +1,5 @@
 
+from __future__ import division
 
 from UDPComms import Subscriber, timeout
 from roboclaw_interface import RoboClaw
@@ -33,14 +34,17 @@ class Arm:
                     'pitch'   : 2 * 34607}
 
         # self.CPR = { 'shoulder': 10, 'elbow':10}
-        self.SPEED_SCALE = 10
+        self.SPEED_SCALE = 0.5
 
         self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128, 129] ) # addresses = [128, 129, 130])
 
+
         try:
             while 1:
+                start_time = time.time()
                 self.update()
-                time.sleep(0.1)
+                while (time.time() - start_time) < 0.1:
+                    pass
         except KeyboardInterrupt:
             self.send_speeds( {motor: 0 for motor in self.motor_names} )
             raise
@@ -128,6 +132,8 @@ class Arm:
 
 
     def update(self):
+        print()
+        print("new iteration")
         self.get_location([ -0.01, 0] )
 
         try:
@@ -146,7 +152,7 @@ class Arm:
             raise
         finally:
             zero = {motor: 0 for motor in self.motor_names}
-            self.send_speeds(zero)
+            self.send_speeds(speeds)
         # exit()
 
 
