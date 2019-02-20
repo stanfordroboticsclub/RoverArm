@@ -33,10 +33,7 @@ class Arm:
                     'yaw'     : -float(48)/28 * 34607 ,
                     'pitch'   : -2 * 34607}
 
-        self.SPEED_SCALE = {'shoulder':10, 
-                            'elbow'   :10,
-                            'yaw'     :1,
-                            'pitch'   :0.1}
+        self.SPEED_SCALE = 10
 
         self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128, 129] ) # addresses = [128, 129, 130])
 
@@ -55,13 +52,19 @@ class Arm:
             self.send_speeds( {motor: 0 for motor in self.motor_names} )
             raise
 
+    def condition_input(self,target):
+        target['x'] = - target['x']
+        target['yaw'] = 0.01* target['yaw']
+        target['pitch'] = 0.01* target['pitch']
+        return target
+
     def send_speeds(self, speeds):
         for motor in self.motor_names:
-            print('driving', motor, 'at', int(self.SPEED_SCALE[motor] * self.CPR[motor] * speeds[motor]))
-            if int(self.SPEED_SCALE[motor] * self.CPR[motor] * speeds[motor]) == 0:
+            print('driving', motor, 'at', int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
+            if int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]) == 0:
                 self.rc.drive_duty(motor, 0)
             else:
-                self.rc.drive_speed(motor, int(self.SPEED_SCALE[motor] * self.CPR[motor] * speeds[motor]))
+                self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
 
 
     def get_location(self):
@@ -86,7 +89,7 @@ class Arm:
         native['shoulder'] = angle + offset
         native['elbow']    = - (math.pi - inside) 
 
-        native['yaw']      = xyz['yaw'] +10*(native['shoulder']+native['elbow'])
+        native['yaw']      = xyz['yaw'] +native['shoulder']+native['elbow']
         #native['yaw']   = xyz['yaw'] 
         native['pitch']    = xyz['pitch']
 
@@ -97,7 +100,7 @@ class Arm:
         xyz['x'] = FIRST_LINK * math.sin(native['shoulder']) + SECOND_LINK * math.sin(native['shoulder'] + native['elbow'])
         xyz['y'] = FIRST_LINK * math.cos(native['shoulder']) + SECOND_LINK * math.cos(native['shoulder'] + native['elbow'])
 
-        xyz['yaw'] =  native['yaw']  - 10*(native['shoulder']+native['elbow'])
+        xyz['yaw'] =  native['yaw']  - (native['shoulder']+native['elbow'])
         xyz['pitch']    = native['pitch']
         return xyz
 
@@ -148,7 +151,8 @@ class Arm:
         try:
             target = self.target_vel.get()
             target = {bytes(key): value for key, value in target.iteritems()}
-            target['x'] = - target['x']
+
+            target = self.condition_input(target)
 
             speeds = self.dnative2(target)
 
