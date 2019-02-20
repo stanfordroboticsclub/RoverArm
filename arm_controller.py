@@ -18,10 +18,6 @@ SECOND_LINK = 500
 
 def find_serial_port():
     return '/dev/serial0'
-    return '/dev/tty.usbmodem1411'
-    return '/dev/ttyUSB0'
-    return '/dev/ttyACM0'
-    return '/dev/tty.usbmodem1141'
 
 class Arm:
     def __init__(self):
@@ -37,8 +33,10 @@ class Arm:
                     'yaw'     : -float(48)/28 * 34607 ,
                     'pitch'   : -2 * 34607}
 
-        # self.CPR = { 'shoulder': 10, 'elbow':10}
-        self.SPEED_SCALE = 10
+        self.SPEED_SCALE = {'shoulder':10, 
+                            'elbow'   :10,
+                            'yaw'     :1,
+                            'pitch'   :0.1}
 
         self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128, 129] ) # addresses = [128, 129, 130])
 
@@ -47,7 +45,7 @@ class Arm:
             while 1:
                 start_time = time.time()
                 self.update()
-                while (time.time() - start_time) < 0.2:
+                while (time.time() - start_time) < 0.1:
                     pass
 
         except KeyboardInterrupt:
@@ -59,11 +57,11 @@ class Arm:
 
     def send_speeds(self, speeds):
         for motor in self.motor_names:
-            print('driving', motor, 'at', int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
-            if int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]) == 0:
+            print('driving', motor, 'at', int(self.SPEED_SCALE[motor] * self.CPR[motor] * speeds[motor]))
+            if int(self.SPEED_SCALE[motor] * self.CPR[motor] * speeds[motor]) == 0:
                 self.rc.drive_duty(motor, 0)
             else:
-                self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
+                self.rc.drive_speed(motor, int(self.SPEED_SCALE[motor] * self.CPR[motor] * speeds[motor]))
 
 
     def get_location(self):
@@ -88,8 +86,8 @@ class Arm:
         native['shoulder'] = angle + offset
         native['elbow']    = - (math.pi - inside) 
 
-        #native['yaw']      = xyz['yaw']  + native['shoulder'] - native['elbow']
-        native['yaw']      = xyz['yaw']  #+ native['shoulder'] - native['elbow']
+        native['yaw']      = xyz['yaw'] +10*(native['shoulder']+native['elbow'])
+        #native['yaw']   = xyz['yaw'] 
         native['pitch']    = xyz['pitch']
 
         return native
@@ -99,7 +97,7 @@ class Arm:
         xyz['x'] = FIRST_LINK * math.sin(native['shoulder']) + SECOND_LINK * math.sin(native['shoulder'] + native['elbow'])
         xyz['y'] = FIRST_LINK * math.cos(native['shoulder']) + SECOND_LINK * math.cos(native['shoulder'] + native['elbow'])
 
-        xyz['yaw'] =  native['yaw']  - native['shoulder'] + native['elbow'] 
+        xyz['yaw'] =  native['yaw']  - 10*(native['shoulder']+native['elbow'])
         xyz['pitch']    = native['pitch']
         return xyz
 
