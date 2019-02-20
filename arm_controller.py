@@ -15,6 +15,7 @@ FIRST_LINK = 500
 SECOND_LINK = 500
 
 # native angles = 0 at extension
+# native angles = positive in the math direction
 
 def find_serial_port():
     return '/dev/serial0'
@@ -55,11 +56,11 @@ class Arm:
             raise
 
     def condition_input(self,target):
-        target['x'] = - target['x']
-        target['yaw'] = 0.01* target['yaw']
+        target['x']     = - target['x']
+        target['yaw']   = 0.01* target['yaw']
         target['pitch'] = 0.01* target['pitch']
 
-
+        # rotates command frame to end effector orientation
         angle = self.xyz_positions['yaw']
         x = target['x']
         y = target['y']
@@ -76,7 +77,6 @@ class Arm:
             else:
                 self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
 
-
     def get_location(self):
         for i,motor in enumerate(self.motor_names):
             encoder = self.rc.read_encoder(motor)[1]
@@ -91,17 +91,25 @@ class Arm:
         native = {}
 
         distance = math.sqrt(xyz['x']**2 + xyz['y']**2)
-        angle = math.atan2(xyz['x'], xyz['y'])
+        angle    = math.atan2(xyz['x'], xyz['y'])
 
         offset = math.acos( ( FIRST_LINK**2 + distance**2 - SECOND_LINK**2  ) / (2*distance * FIRST_LINK) )
         inside = math.acos( ( FIRST_LINK**2 + SECOND_LINK**2 - distance**2  ) / (2*SECOND_LINK * FIRST_LINK) )
 
-        native['shoulder'] = angle + offset
-        native['elbow']    = - (math.pi - inside) 
+        # working
+        # native['shoulder'] = angle + offset
+        # native['elbow']    = - (math.pi - inside) 
 
-        native['yaw']      = xyz['yaw'] +native['shoulder']+native['elbow']
-        #native['yaw']   = xyz['yaw'] 
-        native['pitch']    = xyz['pitch']
+        if self.native_positions['elbow'] < 0:
+            # is in first working configuration
+            native['shoulder'] = angle + offset - math.pi
+            native['elbow']    = - (math.pi - inside)
+        else:
+            native['shoulder'] = angle - offset - math.pi
+            native['elbow']    = (math.pi - inside)
+
+        native['yaw']   = xyz['yaw'] +native['shoulder']+native['elbow']
+        native['pitch'] = xyz['pitch']
 
         return native
 
@@ -110,8 +118,8 @@ class Arm:
         xyz['x'] = FIRST_LINK * math.sin(native['shoulder']) + SECOND_LINK * math.sin(native['shoulder'] + native['elbow'])
         xyz['y'] = FIRST_LINK * math.cos(native['shoulder']) + SECOND_LINK * math.cos(native['shoulder'] + native['elbow'])
 
-        xyz['yaw'] =  native['yaw']  - (native['shoulder']+native['elbow'])
-        xyz['pitch']    = native['pitch']
+        xyz['yaw']   = native['yaw']  - (native['shoulder']+native['elbow'])
+        xyz['pitch'] = native['pitch']
         return xyz
 
     def dnative(self, dxyz):
@@ -145,8 +153,6 @@ class Arm:
 
         dnative = {motor:(f_x_plus_h[motor] - f_x[motor])/h for motor in self.motor_names}
 
-
-
         print("Dxyz   : ", dxyz)
         print("Dnative: ", dnative)
         print("new location: ", self.native_to_xyz ( {motor:dnative[motor] + f_x[motor] for motor in self.motor_names}) )
@@ -160,21 +166,22 @@ class Arm:
 
         try:
             target = self.target_vel.get()
+            # TODO: This shouldn't be necessary, how to fix in UDPComms?
             target = {bytes(key): value for key, value in target.iteritems()}
 
             target = self.condition_input(target)
-
             speeds = self.dnative2(target)
 
-
         except timeout:
+            print "TIMEOUT No commands recived"
+            speeds = {motor: 0 for motor in self.motor_names}
+        except ValueError:
+            print "ValueError The math failed"
             speeds = {motor: 0 for motor in self.motor_names}
         except:
             speeds = {motor: 0 for motor in self.motor_names}
             raise
         finally:
-            zero = {motor: 0 for motor in self.motor_names}
-            #self.send_speeds(zero)
             print "SPEEDS", speeds
             self.send_speeds(speeds)
         # exit()
