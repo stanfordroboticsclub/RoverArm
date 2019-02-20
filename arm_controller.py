@@ -10,6 +10,10 @@ import time
 FIRST_LINK = 457.2
 SECOND_LINK = 457.2
 
+
+FIRST_LINK = 500
+SECOND_LINK = 500
+
 # native angles = 0 at extension
 
 def find_serial_port():
@@ -25,16 +29,16 @@ class Arm:
 
         self.xyz_names = ["x", "y", "yaw", "pitch"]
 
-        self.motor_names = ["shoulder", "elbow", "yaw", "pitch"]
+        self.motor_names = ["elbow", "shoulder", "yaw", "pitch"]
 
         self.native_positions = { motor:0 for motor in self.motor_names}
-        self.CPR = {'shoulder': 10.4 * 1288.848, 
-                    'elbow'   :-10.4 * 921.744,
-                    'yaw'     : float(48)/28 * 34607 ,
-                    'pitch'   : 2 * 34607}
+        self.CPR = {'shoulder':-10.4 * 1288.848, 
+                    'elbow'   : -10.4 * 921.744,
+                    'yaw'     : -float(48)/28 * 34607 ,
+                    'pitch'   : -2 * 34607}
 
         # self.CPR = { 'shoulder': 10, 'elbow':10}
-        self.SPEED_SCALE = 0.5
+        self.SPEED_SCALE = 10
 
         self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128, 129] ) # addresses = [128, 129, 130])
 
@@ -43,8 +47,9 @@ class Arm:
             while 1:
                 start_time = time.time()
                 self.update()
-                while (time.time() - start_time) < 0.1:
+                while (time.time() - start_time) < 0.2:
                     pass
+
         except KeyboardInterrupt:
             self.send_speeds( {motor: 0 for motor in self.motor_names} )
             raise
@@ -54,13 +59,18 @@ class Arm:
 
     def send_speeds(self, speeds):
         for motor in self.motor_names:
-            #print('driving', motor, 'at', int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
-            self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
+            print('driving', motor, 'at', int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
+            if int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]) == 0:
+                self.rc.drive_duty(motor, 0)
+            else:
+                self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
 
-    def get_location(self, locs):
+
+    def get_location(self):
         for i,motor in enumerate(self.motor_names):
-            self.native_positions[motor] = 2 * math.pi * self.rc.read_encoder(motor)[1]/self.CPR[motor]
-            # self.native_positions[motor] = 2 * math.pi * locs[i]
+            encoder = self.rc.read_encoder(motor)[1]
+            print motor,encoder
+            self.native_positions[motor] = 2 * math.pi * encoder/self.CPR[motor]
 
         self.xyz_positions = self.native_to_xyz(self.native_positions)
         print("Current Native: ", self.native_positions)
@@ -78,7 +88,8 @@ class Arm:
         native['shoulder'] = angle + offset
         native['elbow']    = - (math.pi - inside) 
 
-        native['yaw']      = xyz['yaw']  + native['shoulder'] - native['elbow']
+        #native['yaw']      = xyz['yaw']  + native['shoulder'] - native['elbow']
+        native['yaw']      = xyz['yaw']  #+ native['shoulder'] - native['elbow']
         native['pitch']    = xyz['pitch']
 
         return native
@@ -134,16 +145,15 @@ class Arm:
     def update(self):
         print()
         print("new iteration")
-        self.get_location([ -0.01, 0] )
+        self.get_location()
 
         try:
             target = self.target_vel.get()
             target = {bytes(key): value for key, value in target.iteritems()}
-            # targt = [0,-0.1]
+            target['x'] = - target['x']
 
             speeds = self.dnative2(target)
 
-            print "SPEEDS", speeds
 
         except timeout:
             speeds = {motor: 0 for motor in self.motor_names}
@@ -152,6 +162,8 @@ class Arm:
             raise
         finally:
             zero = {motor: 0 for motor in self.motor_names}
+            #self.send_speeds(zero)
+            print "SPEEDS", speeds
             self.send_speeds(speeds)
         # exit()
 
