@@ -28,6 +28,8 @@ class Arm:
         self.motor_names = ["elbow", "shoulder", "yaw", "pitch"]
 
         self.native_positions = { motor:0 for motor in self.motor_names}
+        self.xyz_positions    = { axis:0 for axis in self.xyz_names}
+
         self.CPR = {'shoulder':-10.4 * 1288.848, 
                     'elbow'   : -10.4 * 921.744,
                     'yaw'     : -float(48)/28 * 34607 ,
@@ -56,6 +58,14 @@ class Arm:
         target['x'] = - target['x']
         target['yaw'] = 0.01* target['yaw']
         target['pitch'] = 0.01* target['pitch']
+
+
+        angle = self.xyz_positions['yaw']
+        x = target['x']
+        y = target['y']
+        target['x'] = x*math.cos(angle) - y*math.sin(angle)
+        target['y'] = x*math.sin(angle) + y*math.cos(angle)
+
         return target
 
     def send_speeds(self, speeds):
