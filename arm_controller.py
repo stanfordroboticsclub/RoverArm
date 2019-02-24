@@ -28,6 +28,10 @@ class Arm:
 
         self.motor_names = ["elbow", "shoulder", "yaw", "pitch"]
 
+        self.pwm_names_dummy = ["z", "dummy", "roll", "grip"]
+        # self.pwm_names = ["z", "roll", "grip"]
+        self.pwm_names = ["z"]
+
         self.native_positions = { motor:0 for motor in self.motor_names}
         self.xyz_positions    = { axis:0 for axis in self.xyz_names}
 
@@ -38,7 +42,8 @@ class Arm:
 
         self.SPEED_SCALE = 10
 
-        self.rc = RoboClaw(find_serial_port(), names = self.motor_names, addresses = [128, 129] ) # addresses = [128, 129, 130])
+        self.rc = RoboClaw(find_serial_port(), names = self.motor_names + self.pwm_names_dummy, \
+                                                    addresses = [128, 129, 130, 131])
 
 
         try:
@@ -69,13 +74,17 @@ class Arm:
 
         return target
 
-    def send_speeds(self, speeds):
+    def send_speeds(self, speeds, target):
         for motor in self.motor_names:
             print('driving', motor, 'at', int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
             if int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]) == 0:
                 self.rc.drive_duty(motor, 0)
             else:
                 self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
+
+        for motor in self.pwm_names:
+            print('driving pwm', motor, 'at', int(255*target[motor]))
+            self.rc.drive_duty(motor, int(255*target[motor]))
 
     def get_location(self):
         for i,motor in enumerate(self.motor_names):
@@ -183,7 +192,7 @@ class Arm:
             raise
         finally:
             print "SPEEDS", speeds
-            self.send_speeds(speeds)
+            self.send_speeds(speeds, target)
         # exit()
 
 
