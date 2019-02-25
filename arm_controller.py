@@ -65,6 +65,7 @@ class Arm:
         target['x']     = - target['x']
         target['pitch'] = - target['pitch']
         target['grip'] = - target['grip']
+        target['z'] = - target['z']
 
         target['yaw']   = 0.01* target['yaw']
 
