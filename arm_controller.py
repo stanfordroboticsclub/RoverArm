@@ -29,8 +29,7 @@ class Arm:
         self.motor_names = ["elbow", "shoulder", "yaw", "pitch"]
 
         self.pwm_names_dummy = ["z", "dummy", "roll", "grip"]
-        # self.pwm_names = ["z", "roll", "grip"]
-        self.pwm_names = ["z"]
+        self.pwm_names = ["z", "roll", "grip"]
 
         self.native_positions = { motor:0 for motor in self.motor_names}
         self.xyz_positions    = { axis:0 for axis in self.xyz_names}
@@ -54,10 +53,12 @@ class Arm:
                     pass
 
         except KeyboardInterrupt:
-            self.send_speeds( {motor: 0 for motor in self.motor_names} )
+            self.send_speeds( {motor: 0 for motor in self.motor_names}, 
+                              {motor: 0 for motor in self.pwm_names} )
             raise
         except:
-            self.send_speeds( {motor: 0 for motor in self.motor_names} )
+            self.send_speeds( {motor: 0 for motor in self.motor_names}, 
+                              {motor: 0 for motor in self.pwm_names} )
             raise
 
     def condition_input(self,target):
@@ -83,8 +84,8 @@ class Arm:
                 self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
 
         for motor in self.pwm_names:
-            print('driving pwm', motor, 'at', int(255*target[motor]))
-            self.rc.drive_duty(motor, int(255*target[motor]))
+            print('driving pwm', motor, 'at', int(15000*target[motor]))
+            self.rc.drive_duty(motor, int(15000*target[motor]))
 
     def get_location(self):
         for i,motor in enumerate(self.motor_names):
@@ -178,21 +179,24 @@ class Arm:
             # TODO: This shouldn't be necessary, how to fix in UDPComms?
             target = {bytes(key): value for key, value in target.iteritems()}
 
-            target = self.condition_input(target)
-            speeds = self.dnative2(target)
+            target_f = self.condition_input(target)
+            speeds = self.dnative2(target_f)
 
         except timeout:
             print "TIMEOUT No commands recived"
             speeds = {motor: 0 for motor in self.motor_names}
+            target_f = {motor: 0 for motor in self.pwm_motors}
         except ValueError:
             print "ValueError The math failed"
             speeds = {motor: 0 for motor in self.motor_names}
+            target_f = {motor: 0 for motor in self.pwm_motors}
         except:
             speeds = {motor: 0 for motor in self.motor_names}
+            target_f = {motor: 0 for motor in self.pwm_motors}
             raise
         finally:
-            print "SPEEDS", speeds
-            self.send_speeds(speeds, target)
+            print "SPEEDS", speeds, target_f
+            self.send_speeds(speeds, target_f)
         # exit()
 
 
