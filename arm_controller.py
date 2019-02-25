@@ -24,20 +24,20 @@ class Arm:
     def __init__(self):
         self.target_vel = Subscriber(8410)
 
-        self.xyz_names = ["x", "y", "yaw", "pitch"]
+        self.xyz_names = ["x", "y", "yaw"]
 
-        self.motor_names = ["elbow", "shoulder", "yaw", "pitch"]
+        self.motor_names = ["elbow", "shoulder", "yaw"]
 
-        self.pwm_names_dummy = ["z", "dummy", "roll", "grip"]
-        self.pwm_names = ["z", "roll", "grip"]
+        self.pwm_names_dummy = ["pitch", "z", "dummy", "roll", "grip"]
+        self.pwm_names = ["pitch", "z", "roll", "grip"]
 
         self.native_positions = { motor:0 for motor in self.motor_names}
         self.xyz_positions    = { axis:0 for axis in self.xyz_names}
 
         self.CPR = {'shoulder':-10.4 * 1288.848, 
                     'elbow'   : -10.4 * 921.744,
-                    'yaw'     : -float(48)/28 * 34607 ,
-                    'pitch'   : -2 * 34607}
+                    'yaw'     : -float(48)/28 * 34607}
+                    #'pitch'   : -2 * 34607}
 
         self.SPEED_SCALE = 10
 
@@ -63,8 +63,10 @@ class Arm:
 
     def condition_input(self,target):
         target['x']     = - target['x']
+        target['pitch'] = - target['pitch']
+        target['grip'] = - target['grip']
+
         target['yaw']   = 0.01* target['yaw']
-        target['pitch'] = 0.01* target['pitch']
 
         # rotates command frame to end effector orientation
         angle = self.xyz_positions['yaw']
@@ -119,7 +121,7 @@ class Arm:
             native['elbow']    = (math.pi - inside)
 
         native['yaw']   = xyz['yaw'] +native['shoulder']+native['elbow']
-        native['pitch'] = xyz['pitch']
+        #native['pitch'] = xyz['pitch']
 
         return native
 
@@ -129,7 +131,7 @@ class Arm:
         xyz['y'] = FIRST_LINK * math.cos(native['shoulder']) + SECOND_LINK * math.cos(native['shoulder'] + native['elbow'])
 
         xyz['yaw']   = native['yaw']  - (native['shoulder']+native['elbow'])
-        xyz['pitch'] = native['pitch']
+        #xyz['pitch'] = native['pitch']
         return xyz
 
     def dnative(self, dxyz):
@@ -185,14 +187,14 @@ class Arm:
         except timeout:
             print "TIMEOUT No commands recived"
             speeds = {motor: 0 for motor in self.motor_names}
-            target_f = {motor: 0 for motor in self.pwm_motors}
+            target_f = {motor: 0 for motor in self.pwm_names}
         except ValueError:
             print "ValueError The math failed"
             speeds = {motor: 0 for motor in self.motor_names}
-            target_f = {motor: 0 for motor in self.pwm_motors}
+            target_f = {motor: 0 for motor in self.pwm_names}
         except:
             speeds = {motor: 0 for motor in self.motor_names}
-            target_f = {motor: 0 for motor in self.pwm_motors}
+            target_f = {motor: 0 for motor in self.pwm_names}
             raise
         finally:
             print "SPEEDS", speeds, target_f
