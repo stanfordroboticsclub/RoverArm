@@ -88,8 +88,8 @@ class Arm:
                 self.rc.drive_speed(motor, int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
 
         for motor in self.pwm_names:
-            print('driving pwm', motor, 'at', int(15000*target[motor]))
-            self.rc.drive_duty(motor, int(15000*target[motor]))
+            print('driving pwm', motor, 'at', int(20000*target[motor]))
+            self.rc.drive_duty(motor, int(20000*target[motor]))
 
     def get_location(self):
         for i,motor in enumerate(self.motor_names):
@@ -185,7 +185,8 @@ class Arm:
 
             target_f = self.condition_input(target)
             speeds = self.dnative2(target_f)
-            speeds['elbow'] += 0.005 * target_f['hat'][0]
+            speeds['elbow'] -= 0.002 * target_f['hat'][0]
+            speeds['shoulder'] -= 0.002 * target_f['hat'][1]
 
             if speeds['elbow'] == 0 and speeds['shoulder'] == 0:
                 self.elbow_left = self.native_positions['elbow'] < 0
@@ -198,6 +199,8 @@ class Arm:
             print "ValueError The math failed"
             speeds = {motor: 0 for motor in self.motor_names}
             target_f = {motor: 0 for motor in self.pwm_names}
+            speeds['elbow'] -= 0.002 * target_f['hat'][0]
+            speeds['shoulder'] -= 0.002 * target_f['hat'][1]
         except:
             speeds = {motor: 0 for motor in self.motor_names}
             target_f = {motor: 0 for motor in self.pwm_names}
