@@ -36,7 +36,7 @@ class Arm:
 
         self.CPR = {'shoulder':-10.4 * 1288.848, 
                     'elbow'   : -10.4 * 921.744,
-                    'yaw'     : -float(48)/28 * 34607}
+                    'yaw'     : float(48)/28 * 34607}
                     #'pitch'   : -2 * 34607}
 
         self.SPEED_SCALE = 10
@@ -67,7 +67,7 @@ class Arm:
         target['grip'] = - target['grip']
         target['z'] = - target['z']
 
-        target['yaw']   = 0.01* target['yaw']
+        target['yaw']  = 0.01* target['yaw']
 
         # rotates command frame to end effector orientation
         angle = self.xyz_positions['yaw']
@@ -184,6 +184,7 @@ class Arm:
 
             target_f = self.condition_input(target)
             speeds = self.dnative2(target_f)
+            speeds['elbow'] += 0.005 * target_f['hat'][0]
 
         except timeout:
             print "TIMEOUT No commands recived"
