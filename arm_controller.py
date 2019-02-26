@@ -33,6 +33,7 @@ class Arm:
 
         self.native_positions = { motor:0 for motor in self.motor_names}
         self.xyz_positions    = { axis:0 for axis in self.xyz_names}
+        self.elbow_left = True
 
         self.CPR = {'shoulder':-10.4 * 1288.848, 
                     'elbow'   : -10.4 * 921.744,
@@ -113,7 +114,7 @@ class Arm:
         # native['shoulder'] = angle + offset
         # native['elbow']    = - (math.pi - inside) 
 
-        if self.native_positions['elbow'] < 0:
+        if self.elbow_left:
             # is in first working configuration
             native['shoulder'] = angle + offset - math.pi
             native['elbow']    = - (math.pi - inside)
@@ -185,6 +186,9 @@ class Arm:
             target_f = self.condition_input(target)
             speeds = self.dnative2(target_f)
             speeds['elbow'] += 0.005 * target_f['hat'][0]
+
+            if speeds['elbow'] == 0 and speeds['shoulder'] == 0:
+                self.elbow_left = self.native_positions['elbow'] < 0
 
         except timeout:
             print "TIMEOUT No commands recived"
