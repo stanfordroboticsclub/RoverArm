@@ -191,6 +191,15 @@ class Arm:
             if speeds['elbow'] == 0 and speeds['shoulder'] == 0:
                 self.elbow_left = self.native_positions['elbow'] < 0
 
+            if target_f["reset"]:
+                print "RESETTING!!!"
+                speeds = {motor: 0 for motor in self.motor_names}
+                target_f = {motor: 0 for motor in self.pwm_names}
+                self.send_speeds(speeds, target_f)
+                self.rc.set_encoder("shoulder",0)
+                self.rc.set_encoder("elbow",0)
+                self.rc.set_encoder("yaw",0)
+
         except timeout:
             print "TIMEOUT No commands recived"
             speeds = {motor: 0 for motor in self.motor_names}
