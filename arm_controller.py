@@ -198,7 +198,7 @@ class Arm:
         except ValueError:
             print "ValueError The math failed"
             speeds = {motor: 0 for motor in self.motor_names}
-            target_f = {motor: 0 for motor in self.pwm_names}
+
             speeds['elbow'] -= 0.002 * target_f['hat'][0]
             speeds['shoulder'] -= 0.002 * target_f['hat'][1]
         except:
