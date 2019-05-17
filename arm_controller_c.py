@@ -64,12 +64,12 @@ class Arm:
     def condition_input(self,target): 
         target['x']     = - target['x']
         if(target['pitch'] > .1):
-        	target['pitch'] = - 1.1* (target['pitch']-.1)
+        	target['pitch'] = 1.1* (target['pitch']-.1)
         elif(target['pitch'] < -.1):
-                target['pitch'] = - 1.1* (target['pitch']+.1)
+                target['pitch'] = 1.1* (target['pitch']+.1)
         else:
         	target['pitch'] = 0
-        target['grip'] = - .02*target['grip']
+        target['grip'] =  .04*target['grip']
         target['roll'] = .01*target['roll']
         target['z'] = - target['z']
         if(target['yaw'] > .1): 
