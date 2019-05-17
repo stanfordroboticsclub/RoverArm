@@ -1,0 +1,10 @@
+[Unit]
+Description=Sub: 8410 - End effector target volocity
+
+[Service]
+ExecStart=/usr/bin/python /home/pi/RoverArm/z_controller.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
