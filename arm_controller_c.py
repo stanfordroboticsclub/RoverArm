@@ -47,6 +47,12 @@ class Arm:
                                                     addresses = [130,128,129])
 	self.zeroed = False
 
+	self.storageLoc = [0,0]
+	
+        self.limits = {'shoulder':[-2.03,2.78],
+                       'elbow'   : [-2.70,2.43],
+                       'yaw'     : [-4.3,4.3]}
+
         try:
             while 1:
                 start_time = time.time()
@@ -181,6 +187,21 @@ class Arm:
         print("new location: ", self.native_to_xyz ( {motor:dnative[motor] + f_x[motor] for motor in self.cartesian_motors}) )
         return dnative
 
+    def sign(val):
+	return int(val > 0) - int(val < 0)
+
+    def check_in_bounds(self, speeds):
+	inBounds = True
+	for motor in cartesian_motors:
+	    if(self.sign(speeds[motor] == -1):	       
+		if(self.native_positions[motor] < self.limits[motor][0]):
+	            inBounds = False
+	    elif(self.native_positions[motor] > self.limits[motor][1]):
+	        inBounds = False
+	if(not inBounds):
+	    for motor in cartesian_motors:
+	       speeds[motor] = 0
+	 return speeds
 
     def update(self):
         print()
@@ -197,6 +218,7 @@ class Arm:
             if(not self.zeroed):
                 speeds['elbow'] = 0
                 speeds['shoulder'] = 0
+	    speeds = self.check_in_bounds(speeds)
             speeds['elbow'] -= 0.002 * target_f['hat'][0]
             speeds['shoulder'] -= 0.002 * target_f['hat'][1]
             speeds['yaw'] += target_f['yaw']
