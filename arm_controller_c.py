@@ -53,7 +53,11 @@ class Arm:
 	
         self.limits = {'shoulder':[-2.1,2.0],
                        'elbow'   : [-2.6,2.3],
-                       'yaw'     : [-3.7,3.7]}
+                       'yaw'     : [-3.7,3.7] }
+
+        self.dock_pos = {'shoulder': 2.74,
+                         'elbow'   : -2.49,
+                         'yaw'     : -3.01 }
 
         try:
             while 1:
@@ -189,7 +193,7 @@ class Arm:
         print("new location: ", self.native_to_xyz ( {motor:dnative[motor] + f_x[motor] for motor in self.cartesian_motors}) )
         return dnative
 
-    def sign(val,temp):
+    def sign(val):
 	return int(val > 0) - int(val < 0)
 
     def check_in_bounds(self, speeds):
@@ -204,6 +208,28 @@ class Arm:
             for motor in self.cartesian_motors:
                speeds[motor] = 0
         return speeds
+
+    def dock(speeds):
+        if(abs(self.native_positions['yaw']-self.dock_pos['yaw']>.01):
+            speeds['shoulder'] = 0
+            speeds['elbow'] = 0
+            speeds['yaw'] = self.dock_speed(self.native_positions['yaw'],self.doc_pos['yaw'],.01,.002)
+        elif(abs(self.native_positions['elbow']-self.dock_pos['elbow']>.01):
+            speeds['shoulder'] = 0
+            speeds['elbow'] = self.dock_speed(self.native_positions['elbow'],self.doc_pos['elbow'],.01,.002)
+            speeds['yaw'] = 0
+        else(abs(self.native_positions['shoulder']-self.dock_pos['shoulder']>.01):
+            speeds['shoulder'] = self.dock_speed(self.native_positions['shoulder'],self.doc_pos['shoulder'],.01,.002)
+            speeds['elbow'] = 0
+            speeds['yaw'] = 0
+        return speeds
+
+    def dock_speed(curPos,desiredPos,P,maxV):
+        dir = self.sign(desiredPos-curPos)
+	output = abs(curPos-desiredPos)*P
+	if(output > maxV):
+            output = maxV
+	return output*dir
 
     def update(self):
         print()
@@ -232,6 +258,9 @@ class Arm:
             if speeds['elbow'] == 0 and speeds['shoulder'] == 0:
                 self.elbow_left = self.native_positions['elbow'] < 0
 
+            if(target_f['dock']):
+                speeds=dock(speeds)
+	   
             if target_f["reset"]:
                 print "RESETTING!!!"
                 self.zeroed = True
