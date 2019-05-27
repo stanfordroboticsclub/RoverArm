@@ -1,7 +1,7 @@
 
 from __future__ import division
 
-from UDPComms import Subscriber, timeout
+from UDPComms import Subscriber, timeout,Publisher
 from roboclaw_interface import RoboClaw
 import math
 import time
@@ -25,6 +25,8 @@ class Arm:
         self.target_vel = Subscriber(8410)
 
         self.xyz_names = ["x", "y","yaw"]
+
+        self.output_pub = Publisher(8420)
 
         self.cartesian_motors = ["shoulder","elbow","yaw"]
         self.motor_names = ["shoulder","elbow","yaw","roll","grip"]
@@ -70,24 +72,24 @@ class Arm:
     def condition_input(self,target): 
         target['x']     = - target['x']
         if(target['pitch'] > .1):
-        	target['pitch'] = 1.1* (target['pitch']-.1)
+        	target['pitch'] = -1.23* (target['pitch']-.1)**2
         elif(target['pitch'] < -.1):
-                target['pitch'] = 1.1* (target['pitch']+.1)
+                target['pitch'] = 1.23* (target['pitch']+.1)**2
         else:
         	target['pitch'] = 0
         target['grip'] =  .04*target['grip']
         target['roll'] = .01*target['roll']
         target['z'] = - target['z']
         if(target['yaw'] > .1): 
-        	target['yaw']  = 0.008* (1.1 * (target['yaw']-.1))**2
+        	target['yaw']  = 0.008* (1.1 * (target['yaw']-.1))**3
         elif(target['yaw'] < -.1): 
-        	target['yaw']  = -0.008* (1.1 * (target['yaw']+.1))**2
+        	target['yaw']  = 0.008* (1.1 * (target['yaw']+.1))**3
         else:
         	target['yaw'] = 0
         # rotates command frame to end effector orientation
         angle = self.xyz_positions['yaw']
-        x = target['x']
-        y = target['y']
+        x = target['x']*abs(target['x'])
+        y = target['y']*abs(target['y'])
         if(target['trueXYZ'] == 0):
         	target['x'] = x*math.cos(angle) - y*math.sin(angle)
         	target['y'] = x*math.sin(angle) + y*math.cos(angle)
@@ -207,7 +209,10 @@ class Arm:
         print()
         print("new iteration")
         self.get_location()
-
+        output = {}
+        for d in (self.native_positions,self.xyz_positions): 
+            output.update(d)
+        self.output_pub.send(output)
         try:
             target = self.target_vel.get()
             # TODO: This shouldn't be necessary, how to fix in UDPComms?
