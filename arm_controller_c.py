@@ -28,8 +28,8 @@ class Arm:
 
         self.cartesian_motors = ["shoulder","elbow","yaw"]
         self.motor_names = ["shoulder","elbow","yaw","roll","grip"]
-	self.pwm_names = ["pitch"]
-	self.ordering = ["shoulder","elbow","pitch","yaw","grip","roll"]
+        self.pwm_names = ["pitch"]
+        self.ordering = ["shoulder","elbow","pitch","yaw","grip","roll"]
         self.native_positions = { motor:0 for motor in self.motor_names}
         self.xyz_positions    = { axis:0 for axis in self.xyz_names}
         self.elbow_left = True
@@ -45,13 +45,13 @@ class Arm:
 
         self.rc = RoboClaw(find_serial_port(), names = self.ordering,\
                                                     addresses = [130,128,129])
-	self.zeroed = False
+        self.zeroed = False
 
-	self.storageLoc = [0,0]
+        self.storageLoc = [0,0]
 	
-        self.limits = {'shoulder':[-2.03,2.78],
-                       'elbow'   : [-2.70,2.43],
-                       'yaw'     : [-4.3,4.3]}
+        self.limits = {'shoulder':[-2.1,2.0],
+                       'elbow'   : [-2.6,2.3],
+                       'yaw'     : [-3.7,3.7]}
 
         try:
             while 1:
@@ -109,7 +109,7 @@ class Arm:
     def get_location(self):
         for i,motor in enumerate(self.cartesian_motors):
             encoder = self.rc.read_encoder(motor)[1]
-            print motor,encoder
+            print(motor,encoder)
             self.native_positions[motor] = 2 * math.pi * encoder/self.CPR[motor]
 
         self.xyz_positions = self.native_to_xyz(self.native_positions)
@@ -187,21 +187,21 @@ class Arm:
         print("new location: ", self.native_to_xyz ( {motor:dnative[motor] + f_x[motor] for motor in self.cartesian_motors}) )
         return dnative
 
-    def sign(val):
+    def sign(val,temp):
 	return int(val > 0) - int(val < 0)
 
     def check_in_bounds(self, speeds):
-	inBounds = True
-	for motor in cartesian_motors:
-	    if(self.sign(speeds[motor] == -1):	       
-		if(self.native_positions[motor] < self.limits[motor][0]):
-	            inBounds = False
-	    elif(self.native_positions[motor] > self.limits[motor][1]):
-	        inBounds = False
-	if(not inBounds):
-	    for motor in cartesian_motors:
-	       speeds[motor] = 0
-	 return speeds
+        inBounds = True
+        for motor in self.cartesian_motors:
+            if(self.sign(speeds[motor]) == -1):	       
+                if(self.native_positions[motor] < self.limits[motor][0]):
+                    inBounds = False
+            elif(self.native_positions[motor] > self.limits[motor][1]):
+                inBounds = False
+        if(not inBounds):
+            for motor in self.cartesian_motors:
+               speeds[motor] = 0
+        return speeds
 
     def update(self):
         print()
@@ -218,7 +218,7 @@ class Arm:
             if(not self.zeroed):
                 speeds['elbow'] = 0
                 speeds['shoulder'] = 0
-	    speeds = self.check_in_bounds(speeds)
+            speeds = self.check_in_bounds(speeds)
             speeds['elbow'] -= 0.002 * target_f['hat'][0]
             speeds['shoulder'] -= 0.002 * target_f['hat'][1]
             speeds['yaw'] += target_f['yaw']
