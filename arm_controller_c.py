@@ -51,8 +51,8 @@ class Arm:
 
         self.storageLoc = [0,0]
 	
-        self.limits = {'shoulder':[-2.18,2.7],
-                       'elbow'   : [-2.55,2.24], #-2.77
+        self.limits = {'shoulder':[-2.18,2.85],
+                       'elbow'   : [-2.6,2.24], #-2.77
                        'yaw'     : [-3.7,3.7] }
 
         self.dock_pos = {'shoulder': 2.76,
@@ -198,10 +198,17 @@ class Arm:
 	return int(val > 0) - int(val < 0)
 
     def check_in_bounds(self, speeds):
-        inBounds = True
+        inBounds = True 
+        
+        if(abs(self.native_positions['elbow']) < .4):
+            if(self.native_positions['elbow'] < 0 and self.sign(speeds['elbow']) == 1):
+                inBounds = False
+                print("SINGULARITY")
+            elif(self.native_positions['elbow'] > 0 and self.sign(speeds['elbow']) == -1):
+                inBounds = False
+                print("SINGULARITY")
         for motor in self.cartesian_motors:
             if(self.sign(speeds[motor]) == -1):
-                print("NEG SPEED")	       
                 if(self.native_positions[motor] < self.limits[motor][0]):
                     inBounds = False
             elif(self.native_positions[motor] > self.limits[motor][1]):
@@ -212,23 +219,23 @@ class Arm:
         return speeds
 
     def dock(self,speeds):
-        if(abs(self.native_positions['yaw']-self.dock_pos['yaw'])>.002):
+        if(abs(self.native_positions['yaw']-self.dock_pos['yaw']-.03)>.01):
             speeds['shoulder'] = 0
             speeds['elbow'] = 0
-            speeds['yaw'] = self.dock_speed(self.native_positions['yaw'],self.dock_pos['yaw'],self.dock_speeds[0],self.dock_speeds[1])
-        elif(abs(self.native_positions['elbow']-self.dock_pos['elbow'])>.002):
+            speeds['yaw'] = self.dock_speed(self.native_positions['yaw'],self.dock_pos['yaw']+.03,self.dock_speeds[0],self.dock_speeds[1])
+        elif(abs(self.native_positions['elbow']-self.dock_pos['elbow']+.03)>.01):
             speeds['shoulder'] = 0
-            speeds['elbow'] = self.dock_speed(self.native_positions['elbow'],self.dock_pos['elbow'],self.dock_speeds[0],self.dock_speeds[1])
+            speeds['elbow'] = self.dock_speed(self.native_positions['elbow'],self.dock_pos['elbow']-.03,self.dock_speeds[0],self.dock_speeds[1])
             speeds['yaw'] = 0
-        else:
-            speeds['shoulder'] = self.dock_speed(self.native_positions['shoulder'],self.dock_pos['shoulder'],self.dock_speeds[0],self.dock_speeds[1])
+        elif(abs(self.native_positions['shoulder']-self.dock_pos['shoulder']-.03)>.01):
+            speeds['shoulder'] = self.dock_speed(self.native_positions['shoulder'],self.dock_pos['shoulder']+.03,self.dock_speeds[0],self.dock_speeds[1])
             speeds['elbow'] = 0
             speeds['yaw'] = 0
         return speeds
 
     def dock_speed(self,curPos,desiredPos,P,maxV):
         dir = self.sign(desiredPos-curPos)
-	output = abs(curPos-desiredPos)*P+.00025
+	output = abs(curPos-desiredPos)*P+.0005
 	if(output > maxV):
             output = maxV
 	return output*dir
