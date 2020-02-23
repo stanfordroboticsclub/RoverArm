@@ -70,6 +70,9 @@ class RoboClaw:
     def read_version(self, motor):
         return roboclaw_driver.ReadVersion(self.address[motor])
 
+    def read_limit(self, motor):
+        return read_status(motor) == (0x2000 << self.motor_num[motor])
+
     def read_status(self,motor):
         status = roboclaw_driver.ReadError(self.address[motor])
         if status[0]:

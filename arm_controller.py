@@ -14,6 +14,8 @@ SECOND_LINK = 457.2
 FIRST_LINK = 500
 SECOND_LINK = 500
 
+SHOULDER_HOME = -175;
+
 # native angles = 0 at extension
 # native angles = positive in the math direction
 
@@ -33,6 +35,8 @@ class Arm:
         self.pwm_names = ["pitch"]
         self.ordering = ["shoulder","elbow","pitch","yaw","grip","roll"]
         self.native_positions = { motor:0 for motor in self.motor_names}
+        self.home_status = { motor:False for motor in self.motor_names}
+        self.currents = { motor:0 for motor in self.motor_names}
         self.xyz_positions    = { axis:0 for axis in self.xyz_names}
         self.elbow_left = True
 
@@ -60,6 +64,8 @@ class Arm:
                          'yaw'     : -3.01 }
         self.dock_speeds = [.01,.006]
 
+        self.forcing = False
+
         try:
             while 1:
                 start_time = time.time()
@@ -74,6 +80,7 @@ class Arm:
             self.send_speeds( {motor: 0 for motor in self.motor_names}, {motor: 0 for motor in self.pwm_names} )
             raise
 
+    #deadbands & nonlinear controls on speed
     def condition_input(self,target): 
         target['x']     = - target['x']
         if(target['pitch'] > .1):
@@ -101,6 +108,7 @@ class Arm:
 
         return target
 
+    #output all speeds to all motors
     def send_speeds(self, speeds, target):
         for motor in self.motor_names:
             print('driving', motor, 'at', int(self.SPEED_SCALE * self.CPR[motor] * speeds[motor]))
@@ -113,11 +121,17 @@ class Arm:
             print('driving pwm', motor, 'at', int(20000*target[motor]))
             self.rc.drive_duty(motor, int(20000*target[motor]))
 
-    def get_location(self):
+    #check if motors are homed, get position & currents
+    def get_status(self):
+        self.forcing = False
         for i,motor in enumerate(self.cartesian_motors):
             encoder = self.rc.read_encoder(motor)[1]
             print(motor,encoder)
             self.native_positions[motor] = 2 * math.pi * encoder/self.CPR[motor]
+            self.home_status[motor] = self.rc.read_limit(motor)
+            self.currents[motor] = self.rc.read_current(motor)
+            if(self.currents[motor] > 1.5):
+                self.forcing = True
 
         self.xyz_positions = self.native_to_xyz(self.native_positions)
         print("Current Native: ", self.native_positions)
@@ -131,10 +145,6 @@ class Arm:
 
         offset = math.acos( ( FIRST_LINK**2 + distance**2 - SECOND_LINK**2  ) / (2*distance * FIRST_LINK) )
         inside = math.acos( ( FIRST_LINK**2 + SECOND_LINK**2 - distance**2  ) / (2*SECOND_LINK * FIRST_LINK) )
-
-        # working
-        # native['shoulder'] = angle + offset
-        # native['elbow']    = - (math.pi - inside) 
 
         if self.elbow_left:
             # is in first working configuration
@@ -158,6 +168,7 @@ class Arm:
 #        xyz['pitch'] = native['pitch']
         return xyz
 
+    # analytic jacobian of angles -> XYZ
     def dnative(self, dxyz):
         x = self.xyz_positions['x']
         y = self.xyz_positions['y']
@@ -179,6 +190,7 @@ class Arm:
         print("new location: ", self.native_to_xyz ( {motor:dnative[motor] + self.native_positions[motor] for motor in self.motor_names}) )
         return dnative
 
+    #numerical jacobian of angles -> XYZ
     def dnative2(self, dxyz):
         h = 0.00000001
        # print dxyz, self.xyz_positions
@@ -197,6 +209,7 @@ class Arm:
     def sign(self,val):
 	return int(val > 0) - int(val < 0)
 
+    #prevent movement near singularity or if the motor is out of bounds or at home
     def check_in_bounds(self, speeds):
         inBounds = True 
         
@@ -213,11 +226,21 @@ class Arm:
                     inBounds = False
             elif(self.native_positions[motor] > self.limits[motor][1]):
                 inBounds = False
+
+        if(self.home_status['shoulder'] == True):
+            self.rc.set_encoder('shoulder',SHOULDER_HOME)
+            inBounds = False
+
+        if(self.home_status['elbow'] == True):
+            self.rc.set_encoder('elbow',ELBOW_HOME)
+            inBounds = False
+
         if(not inBounds):
             for motor in self.cartesian_motors:
                speeds[motor] = 0
         return speeds
 
+    #return to our docking position
     def dock(self,speeds):
         if(abs(self.native_positions['yaw']-self.dock_pos['yaw']-.03)>.01):
             speeds['shoulder'] = 0
@@ -233,20 +256,23 @@ class Arm:
             speeds['yaw'] = 0
         return speeds
 
+
+    #PID for docking speed
     def dock_speed(self,curPos,desiredPos,P,maxV):
         dir = self.sign(desiredPos-curPos)
-	output = abs(curPos-desiredPos)*P+.0005
-	if(output > maxV):
+    	output = abs(curPos-desiredPos)*P+.0005
+    	if(output > maxV):
             output = maxV
-	return output*dir
+    	return output*dir
 
     def update(self):
         print()
         print("new iteration")
-        self.get_location()
+        self.get_status()
         output = {}
         for d in (self.native_positions,self.xyz_positions): 
             output.update(d)
+        output{"forcing"} = forcing
         self.output_pub.send(output)
         try:
             target = self.target_vel.get()
