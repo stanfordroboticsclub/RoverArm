@@ -5,7 +5,7 @@ from UDPComms import Subscriber, timeout,Publisher
 from roboclaw_interface import RoboClaw
 import math
 import time
-
+import RPi.GPIO as GPIO
 
 FIRST_LINK = 457.2
 SECOND_LINK = 457.2
@@ -14,7 +14,10 @@ SECOND_LINK = 457.2
 FIRST_LINK = 500
 SECOND_LINK = 500
 
-SHOULDER_HOME = -175;
+SHOULDER_HOME_INPUT = 20
+ELBOW_HOME_INPUT = 16
+SHOULDER_HOME = -175
+ELBOW_HOME = 170
 
 # native angles = 0 at extension
 # native angles = positive in the math direction
@@ -24,6 +27,9 @@ def find_serial_port():
 
 class Arm:
     def __init__(self):
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(SHOULDER_HOME_INPUT, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+        GPIO.setup(ELBOW_HOME_INPUT, GPIO.IN, pull_up_down = GPIO.PUD_UP)
         self.target_vel = Subscriber(8410)
 
         self.xyz_names = ["x", "y","yaw"]
@@ -35,7 +41,7 @@ class Arm:
         self.pwm_names = ["pitch"]
         self.ordering = ["shoulder","elbow","pitch","yaw","grip","roll"]
         self.native_positions = { motor:0 for motor in self.motor_names}
-        self.home_status = { motor:False for motor in self.motor_names}
+
         self.currents = { motor:0 for motor in self.motor_names}
         self.xyz_positions    = { axis:0 for axis in self.xyz_names}
         self.elbow_left = True
@@ -128,7 +134,6 @@ class Arm:
             encoder = self.rc.read_encoder(motor)[1]
             print(motor,encoder)
             self.native_positions[motor] = 2 * math.pi * encoder/self.CPR[motor]
-            self.home_status[motor] = self.rc.read_limit(motor)
             self.currents[motor] = self.rc.read_current(motor)
             if(self.currents[motor] > 1.5):
                 self.forcing = True
@@ -207,7 +212,7 @@ class Arm:
         return dnative
 
     def sign(self,val):
-	return int(val > 0) - int(val < 0)
+        return int(val > 0) - int(val < 0)
 
     #prevent movement near singularity or if the motor is out of bounds or at home
     def check_in_bounds(self, speeds):
@@ -227,11 +232,11 @@ class Arm:
             elif(self.native_positions[motor] > self.limits[motor][1]):
                 inBounds = False
 
-        if(self.home_status['shoulder'] == True):
+        if(GPIO.input(SHOULDER_HOME_INPUT)):
             self.rc.set_encoder('shoulder',SHOULDER_HOME)
             inBounds = False
 
-        if(self.home_status['elbow'] == True):
+        if(GPIO.input(ELBOW_HOME_INPUT)):
             self.rc.set_encoder('elbow',ELBOW_HOME)
             inBounds = False
 
@@ -260,19 +265,22 @@ class Arm:
     #PID for docking speed
     def dock_speed(self,curPos,desiredPos,P,maxV):
         dir = self.sign(desiredPos-curPos)
-    	output = abs(curPos-desiredPos)*P+.0005
-    	if(output > maxV):
+        output = abs(curPos-desiredPos)*P+.0005
+        if(output > maxV):
             output = maxV
-    	return output*dir
+        return output*dir
 
     def update(self):
         print()
         print("new iteration")
         self.get_status()
         output = {}
+        print("read status of shoulder", GPIO.input(20))
         for d in (self.native_positions,self.xyz_positions): 
             output.update(d)
-        output{"forcing"} = forcing
+        #print("HOME STATUS ", self.home_status)
+        #output.update({"shoulder limit", self.home_status["shoulder"]})
+        output.update({"forcing":self.forcing})
         self.output_pub.send(output)
         try:
             target = self.target_vel.get()
@@ -297,7 +305,7 @@ class Arm:
                 speeds=self.dock(speeds)
 	   
             if target_f["reset"]:
-                print "RESETTING!!!"
+                print ("RESETTING!!!")
                 self.zeroed = True
                 speeds = {motor: 0 for motor in self.motor_names}
                 target_f = {motor: 0 for motor in self.pwm_names}
@@ -307,7 +315,7 @@ class Arm:
                 self.rc.set_encoder("yaw",0)
 
             elif target_f["resetdock"]:
-                print "RESETTING (in dock position)!!!"
+                print ("RESETTING (in dock position)!!!")
                 self.zeroed = True
                 speeds = {motor: 0 for motor in self.motor_names}
                 target_f = {motor: 0 for motor in self.pwm_names}
@@ -317,12 +325,12 @@ class Arm:
                 self.rc.set_encoder("yaw",int(self.CPR["yaw"]*self.dock_pos['yaw']/6.28))
 
         except timeout:
-            print "TIMEOUT No commands recived"
+            print ("TIMEOUT No commands recived")
             speeds = {motor: 0 for motor in self.motor_names}
-	    target_f = {}
+            target_f = {}
             target_f = {motor: 0 for motor in self.pwm_names}
         except ValueError:
-            print "ValueError The math failed"
+            print ("ValueError The math failed")
             speeds = {motor: 0 for motor in self.motor_names}
 
             speeds['elbow'] -= 0.002 * target_f['hat'][0]
@@ -332,7 +340,7 @@ class Arm:
             target_f = {motor: 0 for motor in self.pwm_names}
             raise
         finally:
-            print "SPEEDS", speeds, target_f
+            print ("SPEEDS"), speeds, target_f
             self.send_speeds(speeds, target_f)
         # exit()
 

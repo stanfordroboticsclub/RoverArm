@@ -70,9 +70,6 @@ class RoboClaw:
     def read_version(self, motor):
         return roboclaw_driver.ReadVersion(self.address[motor])
 
-    def read_limit(self, motor):
-        return read_status(motor) == (0x2000 << self.motor_num[motor])
-
     def read_status(self,motor):
         status = roboclaw_driver.ReadError(self.address[motor])
         if status[0]:
@@ -94,7 +91,13 @@ class RoboClaw:
             0x2000: 'Warning: High Temperature - Sensor 2',
             0x4000: 'Home - Motor 1',
             0x8000: 'Home - Motor 2'
-        }.get(status[1], 'Unknown Error')
+            }.get(status[1], 'Unknown Error')
+        return 'status bit zero not set'
+
+
+    def read_limit(self, motor):
+        return self.read_status(motor) == (0x2000 << self.motor_num[motor])
+
 
     #tenths of a volte
     def read_main_battery_voltage(self, motor):

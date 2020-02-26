@@ -2,7 +2,7 @@
 Description=Sub: 8410 - End effector target volocity
 
 [Service]
-ExecStart=/usr/bin/python /home/pi/RoverArm/arm_controller.py
+#ExecStart=/usr/bin/python /home/pi/RoverArm/arm_controller.py
 Restart=always
 RestartSec=5
 
