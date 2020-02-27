@@ -46,9 +46,9 @@ class Arm:
         self.xyz_positions    = { axis:0 for axis in self.xyz_names}
         self.elbow_left = True
 
-        self.CPR = {'shoulder':-10.4 * 4802.493,
-                    'elbow'   : 10.4 * 4802.493,
-                    'yaw'     : float(48)/27 * 34607,
+        self.CPR = {'shoulder': -12.08 * 4776.38,
+                    'elbow'   : -12.08 * 2442.96,
+                    'yaw'     : -float(48)/27 * 34607,
                     'roll'    : 455.185*float(12*53/20),
                     'grip'    : 103.814*float(12*36/27)}
         #            'pitch'   : -2 * 34607}
@@ -106,7 +106,7 @@ class Arm:
         	target['yaw'] = 0
         # rotates command frame to end effector orientation
         angle = self.xyz_positions['yaw']
-        x = target['x']*abs(target['x'])
+        x = -target['x']*abs(target['x'])
         y = target['y']*abs(target['y'])
         if(target['trueXYZ'] == 0):
         	target['x'] = x*math.cos(angle) - y*math.sin(angle)
@@ -146,7 +146,7 @@ class Arm:
         native = {}
 
         distance = math.sqrt(xyz['x']**2 + xyz['y']**2)
-        angle    = math.atan2(xyz['x'], xyz['y'])
+        angle    = -math.atan2(xyz['x'], xyz['y'])
 
         offset = math.acos( ( FIRST_LINK**2 + distance**2 - SECOND_LINK**2  ) / (2*distance * FIRST_LINK) )
         inside = math.acos( ( FIRST_LINK**2 + SECOND_LINK**2 - distance**2  ) / (2*SECOND_LINK * FIRST_LINK) )
@@ -159,17 +159,17 @@ class Arm:
             native['shoulder'] = angle - offset - math.pi
             native['elbow']    = (math.pi - inside)
 
-        native['yaw']   = xyz['yaw'] +native['shoulder']+native['elbow']
+        native['yaw']   = xyz['yaw'] -native['shoulder']-native['elbow']
 #        native['pitch'] = xyz['pitch']
 
         return native
 
     def native_to_xyz(self, native):
         xyz = {}
-        xyz['x'] = FIRST_LINK * math.sin(native['shoulder']) + SECOND_LINK * math.sin(native['shoulder'] + native['elbow'])
+        xyz['x'] = -FIRST_LINK * math.sin(native['shoulder']) - SECOND_LINK * math.sin(native['shoulder'] + native['elbow'])
         xyz['y'] = FIRST_LINK * math.cos(native['shoulder']) + SECOND_LINK * math.cos(native['shoulder'] + native['elbow'])
 
-        xyz['yaw']   = native['yaw']  - (native['shoulder']+native['elbow'])
+        xyz['yaw']   = native['yaw']  + (native['shoulder']+native['elbow'])
 #        xyz['pitch'] = native['pitch']
         return xyz
 
