@@ -16,8 +16,8 @@ SECOND_LINK = 500
 
 SHOULDER_HOME_INPUT = 20
 ELBOW_HOME_INPUT = 16
-SHOULDER_HOME = -175
-ELBOW_HOME = 170
+SHOULDER_HOME = -1
+ELBOW_HOME = -2.78
 
 # native angles = 0 at extension
 # native angles = positive in the math direction
@@ -62,7 +62,7 @@ class Arm:
         self.storageLoc = [0,0]
 	
         self.limits = {'shoulder':[-2.18,2.85],
-                       'elbow'   : [-2.6,2.24], #-2.77
+                       'elbow'   : [-4,2.24], #-2.77
                        'yaw'     : [-3.7,3.7] }
 
         self.dock_pos = {'shoulder': 2.76,
@@ -231,15 +231,20 @@ class Arm:
                     inBounds = False
             elif(self.native_positions[motor] > self.limits[motor][1]):
                 inBounds = False
+        if(not inBounds):
+            for motor in self.cartesian_motors:
+               speeds[motor] = 0
+        return speeds
 
-        if(GPIO.input(SHOULDER_HOME_INPUT)):
+    def check_limits(self, speeds):
+        inBounds = True 
+        if(GPIO.input(SHOULDER_HOME_INPUT) and self.sign(speeds['elbow']) == 1):
             self.rc.set_encoder('shoulder',SHOULDER_HOME)
             inBounds = False
 
-        if(GPIO.input(ELBOW_HOME_INPUT)):
-            self.rc.set_encoder('elbow',ELBOW_HOME)
+        if(GPIO.input(ELBOW_HOME_INPUT) and self.sign(speeds['elbow']) == -1):
+            self.rc.set_encoder('elbow',ELBOW_HOME*self.cpr['elbow'])
             inBounds = False
-
         if(not inBounds):
             for motor in self.cartesian_motors:
                speeds[motor] = 0
@@ -298,6 +303,7 @@ class Arm:
             speeds['yaw'] += target_f['yaw']
             speeds['roll'] = target_f['roll']
             speeds['grip'] = target_f['grip'] + speeds['roll']
+            speeds = self.check_limits(speeds)
             if speeds['elbow'] == 0 and speeds['shoulder'] == 0:
                 self.elbow_left = self.native_positions['elbow'] < 0
 
